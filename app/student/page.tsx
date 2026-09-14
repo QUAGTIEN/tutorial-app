@@ -1,20 +1,17 @@
-import { and, desc, eq } from 'drizzle-orm';
-import { ClipboardCheck } from 'lucide-react';
+'use client';
+
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { ClipboardCheck } from 'lucide-react';
+import { AppHeader } from '@/components/layout/app-header';
+import { RequireRole } from '@/components/auth/require-role';
+import { firestore } from '@/lib/firebase';
+import type { Exam } from '@/lib/quiz-types';
 
-import { AppShell } from '@/components/layout/app-shell';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getDb } from '@/db';
-import { exams, submissions } from '@/db/schema';
-import { requireRole } from '@/lib/auth';
-
-export default async function StudentPage() {
-  const user = await requireRole('STUDENT'); const db = getDb();
-  const availableExams = await db.select().from(exams).where(eq(exams.isPublished, true)).orderBy(desc(exams.updatedAt)).all();
-  const completed = await db.select({ examId: submissions.examId, score: submissions.score }).from(submissions).where(eq(submissions.studentId, user.id)).all();
-  const submittedByExam = new Map(completed.map((row) => [row.examId, row.score]));
-  return <AppShell user={user}><div className="mb-7"><p className="text-sm font-medium text-blue-700">Khu vực học sinh</p><h1 className="mt-1 text-3xl font-bold tracking-tight">Đề kiểm tra đang mở</h1><p className="mt-2 text-slate-600">Chọn một đề để bắt đầu làm bài. Mỗi đề chỉ nộp được một lần.</p></div>
-    {availableExams.length === 0 ? <Card><CardContent className="grid place-items-center gap-3 py-16 text-center"><ClipboardCheck className="size-9 text-blue-500" /><div><h2 className="font-semibold">Chưa có đề để làm</h2><p className="mt-1 text-sm text-slate-600">Hãy quay lại sau khi giáo viên công bố đề.</p></div></CardContent></Card> : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{availableExams.map((exam) => { const score = submittedByExam.get(exam.id); const completedExam = score !== undefined; return <Card key={exam.id} className="flex h-full"><CardHeader><Badge variant={completedExam ? 'secondary' : 'default'}>{completedExam ? 'Đã nộp' : 'Sẵn sàng làm'}</Badge><CardTitle className="mt-3">{exam.title}</CardTitle></CardHeader><CardContent className="flex flex-1 flex-col"><p className="flex-1 text-sm text-slate-600">{exam.description || 'Không có mô tả.'}</p>{completedExam ? <p className="mt-5 text-sm font-semibold text-blue-700">Điểm của bạn: {score}</p> : <Link href={`/student/exams/${exam.id}`} className="mt-5 inline-flex h-9 items-center justify-center rounded-lg bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700">Làm bài</Link>}</CardContent></Card>})}</div>}
-  </AppShell>;
+function StudentDashboard() {
+  const [exams, setExams] = useState<Exam[]>([]);
+  useEffect(() => onSnapshot(query(collection(firestore, 'exams'), where('isPublished', '==', true)), (snapshot) => setExams(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as Exam).sort((a, b) => (b.updatedAt?.toMillis() ?? 0) - (a.updatedAt?.toMillis() ?? 0)))), []);
+  return <><AppHeader role="STUDENT" /><main className="mx-auto max-w-5xl px-4 py-8 sm:px-6"><p className="text-sm font-medium text-primary">Khu vực học sinh</p><h1 className="text-3xl font-bold">Đề đang mở</h1><p className="mt-2 text-muted-foreground">Chọn một đề để bắt đầu làm bài.</p><div className="mt-8 grid gap-4 sm:grid-cols-2">{exams.map((exam) => <article key={exam.id} className="flex flex-col rounded-xl border bg-card p-5 shadow-sm"><h2 className="text-xl font-semibold">{exam.title}</h2><p className="mt-2 flex-1 text-sm text-muted-foreground">{exam.description || 'Không có mô tả.'}</p><p className="mt-4 text-sm">{exam.questionCount} câu hỏi</p><Link href={`/student/exams/${exam.id}`} className="mt-5 rounded-lg bg-primary px-4 py-2.5 text-center font-medium text-primary-foreground">Bắt đầu làm bài</Link></article>)}{!exams.length && <div className="col-span-full rounded-xl border border-dashed p-12 text-center"><ClipboardCheck className="mx-auto mb-3 text-muted-foreground" /><h2 className="font-semibold">Chưa có đề đang mở</h2><p className="mt-1 text-sm text-muted-foreground">Giáo viên sẽ công bố đề tại đây.</p></div>}</div></main></>;
 }
+export default function StudentPage() { return <RequireRole role="STUDENT"><StudentDashboard /></RequireRole>; }

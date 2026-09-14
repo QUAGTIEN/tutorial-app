@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function teacher() {
+      return signedIn() && request.auth.uid == 'Dbn4Y2L4HTMv1yUGOmBdBZVMc0F2';
+    }
+
+    match /exams/{examId} {
+      allow read: if teacher() || (signedIn() && resource.data.isPublished == true);
+      allow create, update, delete: if teacher();
+      match /questions/{questionId} {
+        allow read: if teacher() || (signedIn() && get(/databases/$(database)/documents/exams/$(examId)).data.isPublished == true);
+        allow write: if teacher();
+      }
+    }
+
+    match /examKeys/{examId} {
+      allow read, write: if teacher();
+    }
+
+    match /submissions/{submissionId} {
+      allow read: if teacher() || (signedIn() && resource.data.studentId == request.auth.uid);
+      allow write: if false;
+    }
+  }
+}

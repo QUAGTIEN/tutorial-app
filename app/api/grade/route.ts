@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 
 export const runtime = 'nodejs';
+const teacherUid = 'Dbn4Y2L4HTMv1yUGOmBdBZVMc0F2';
 
 export async function POST(request: Request) {
   try {
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Bạn cần đăng nhập để nộp bài.' }, { status: 401 });
     }
     const token = await adminAuth().verifyIdToken(authorization.slice(7));
-    if (token.uid === process.env.NEXT_PUBLIC_TEACHER_UID) {
+    if (token.uid === teacherUid) {
       return NextResponse.json({ error: 'Tài khoản giáo viên không thể nộp bài.' }, { status: 403 });
     }
     const body = await request.json() as { examId?: string; answers?: Record<string, unknown> };

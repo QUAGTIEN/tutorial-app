@@ -5,15 +5,32 @@ import { getFirestore } from 'firebase-admin/firestore';
 function adminApp() {
   if (getApps().length) return getApps()[0]!;
 
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error('Firebase Admin credentials are not configured.');
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!raw) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not configured.');
   }
 
-  return initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
+  let serviceAccount: { project_id?: string; client_email?: string; private_key?: string };
+  try {
+    serviceAccount = JSON.parse(raw);
+  } catch {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON must contain valid JSON.');
+  }
+  if (
+    serviceAccount.project_id !== 'tutorial-app-82767' ||
+    !serviceAccount.client_email ||
+    !serviceAccount.private_key
+  ) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not for the configured Firebase project.');
+  }
+
+  return initializeApp({
+    credential: cert({
+      projectId: serviceAccount.project_id,
+      clientEmail: serviceAccount.client_email,
+      privateKey: serviceAccount.private_key.replace(/\\n/g, '\n'),
+    }),
+  });
 }
 
 export function adminAuth() {
